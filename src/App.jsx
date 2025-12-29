@@ -34,13 +34,18 @@ export default function App() {
     oscillator.stop(audioCtx.currentTime + 0.1);
   };
 
-  const speakScore = (sA, sB) => {
-    const msg = new SpeechSynthesisUtterance(`${sA} 대 ${sB}`);
+const speakScore = (sA, sB) => {
+    // 팀 이름이 없을 경우를 대비해 기본값 설정
+    const nameA = teamAName || 'A팀';
+    const nameB = teamBName || 'B팀';
+    
+    // 예: "나이스 팀 5 대 스마트 팀 3"
+    const msg = new SpeechSynthesisUtterance(`${nameA} ${sA} 대 ${nameB} ${sB}`);
+    
     msg.lang = 'ko-KR';
-    msg.rate = 0.9;
+    msg.rate = 0.9; // 아까 조절한 천천히 말하는 속도
     window.speechSynthesis.speak(msg);
   };
-
   // --- 유틸리티 기능 ---
   const vibrate = () => {
     if (typeof navigator !== 'undefined' && navigator.vibrate) {
