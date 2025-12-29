@@ -37,7 +37,7 @@ export default function App() {
   const speakScore = (sA, sB) => {
     const msg = new SpeechSynthesisUtterance(`${sA} 대 ${sB}`);
     msg.lang = 'ko-KR';
-    msg.rate = 1.3;
+    msg.rate = 0.9;
     window.speechSynthesis.speak(msg);
   };
 
