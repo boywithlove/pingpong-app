@@ -40,7 +40,7 @@ const speakScore = (sA, sB) => {
     const nameB = teamBName || 'B팀';
     
     // 예: "나이스 팀 5 대 스마트 팀 3"
-    const msg = new SpeechSynthesisUtterance(`${nameA} ${sA} 대 ${nameB} ${sB}`);
+    const msg = new SpeechSynthesisUtterance(`${nameA} ${sA} 대 ${nameB} ${sB} 입니다다`);
     
     msg.lang = 'ko-KR';
     msg.rate = 0.9; // 아까 조절한 천천히 말하는 속도
