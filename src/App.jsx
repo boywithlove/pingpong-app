@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import './index.css'; //
 
 export default function App() {
   // --- 상태 관리 ---
@@ -17,6 +16,30 @@ export default function App() {
   const [swapped, setSwapped] = useState(false);
   const [setsToWin, setSetsToWin] = useState(3); 
   const [history, setHistory] = useState([]);
+
+  // 추가: 초기 서브권 상태 (A 또는 B)
+  const [initialServer, setInitialServer] = useState('A');
+
+  // --- 효과음 및 TTS 기능 ---
+  const playBeep = () => {
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const oscillator = audioCtx.createOscillator();
+    const gainNode = audioCtx.createGain();
+    oscillator.connect(gainNode);
+    gainNode.connect(audioCtx.destination);
+    oscillator.type = 'sine';
+    oscillator.frequency.setValueAtTime(880, audioCtx.currentTime);
+    gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime);
+    oscillator.start();
+    oscillator.stop(audioCtx.currentTime + 0.1);
+  };
+
+  const speakScore = (sA, sB) => {
+    const msg = new SpeechSynthesisUtterance(`${sA} 대 ${sB}`);
+    msg.lang = 'ko-KR';
+    msg.rate = 1.3;
+    window.speechSynthesis.speak(msg);
+  };
 
   // --- 유틸리티 기능 ---
   const vibrate = () => {
@@ -41,25 +64,39 @@ export default function App() {
     setHistory(prev => prev.slice(0, -1));
   };
 
+  // 서브권 로직 수정: 선택한 initialServer를 기준으로 계산
   const getServer = () => {
     const totalScore = scoreA + scoreB;
-    if (scoreA >= 10 && scoreB >= 10) return totalScore % 2 === 0 ? 'A' : 'B';
-    return Math.floor(totalScore / 2) % 2 === 0 ? 'A' : 'B';
+    let current;
+    if (scoreA >= 10 && scoreB >= 10) {
+      current = totalScore % 2 === 0 ? 'START' : 'OTHER';
+    } else {
+      current = Math.floor(totalScore / 2) % 2 === 0 ? 'START' : 'OTHER';
+    }
+    
+    if (current === 'START') return initialServer;
+    return initialServer === 'A' ? 'B' : 'A';
   };
 
   const handleScore = (target) => {
     if (matchFinished) return;
     vibrate();
+    playBeep(); // 효과음
     saveHistory();
+    
+    let newA = scoreA;
+    let newB = scoreB;
+
     if (target === 'A') {
-      const newScore = scoreA + 1;
-      setScoreA(newScore);
-      checkSetWin(newScore, scoreB);
+      newA = scoreA + 1;
+      setScoreA(newA);
+      checkSetWin(newA, scoreB);
     } else {
-      const newScore = scoreB + 1;
-      setScoreB(newScore);
-      checkSetWin(scoreA, newScore);
+      newB = scoreB + 1;
+      setScoreB(newB);
+      checkSetWin(scoreA, newB);
     }
+    speakScore(newA, newB); // TTS 점수 안내
   };
 
   const checkSetWin = (sA, sB) => {
@@ -77,6 +114,8 @@ export default function App() {
         }
         setScoreA(0); setScoreB(0);
         setSwapped(prev => !prev);
+        // 세트가 바뀌면 다음 세트 첫 서브권도 교체
+        setInitialServer(prev => prev === 'A' ? 'B' : 'A');
       }, 300);
     }
   };
@@ -103,8 +142,6 @@ export default function App() {
     return (
       <div className="min-h-screen bg-slate-950 flex items-center justify-center p-6 text-white font-sans">
         <div className="w-full max-w-md bg-slate-900 border border-slate-800 p-8 rounded-[2rem] shadow-2xl">
-          
-          {/* 이미지 크기를 w-40으로 줄였습니다 */}
           <div className="flex justify-center mb-6 relative">
             <div className="absolute -inset-1 bg-gradient-to-r from-blue-600 to-red-600 rounded-2xl blur opacity-20"></div>
             <img 
@@ -125,6 +162,8 @@ export default function App() {
               className="w-full bg-slate-800 border-none p-4 rounded-xl text-lg focus:ring-2 ring-red-500 outline-none"
               placeholder="B팀 이름" value={teamBName} onChange={e => setTeamBName(e.target.value)}
             />
+            
+            {/* 승리 조건 선택 */}
             <div className="flex items-center justify-between p-3 bg-slate-800/50 rounded-xl border border-slate-800">
               <span className="text-sm font-medium text-slate-400">승리 조건</span>
               <select 
@@ -135,6 +174,25 @@ export default function App() {
                 <option value={3}>5판 3선승</option>
                 <option value={4}>7판 4선승</option>
               </select>
+            </div>
+
+            {/* 추가: 첫 서브권 선택 */}
+            <div className="p-3 bg-slate-800/50 rounded-xl border border-slate-800">
+              <span className="text-sm font-medium text-slate-400 block mb-2">첫 서브권</span>
+              <div className="flex gap-2">
+                <button 
+                  onClick={() => setInitialServer('A')}
+                  className={`flex-1 py-2 rounded-lg font-bold transition-all ${initialServer === 'A' ? 'bg-blue-600 text-white' : 'bg-slate-700 text-slate-400'}`}
+                >
+                  {teamAName || 'A팀'}
+                </button>
+                <button 
+                  onClick={() => setInitialServer('B')}
+                  className={`flex-1 py-2 rounded-lg font-bold transition-all ${initialServer === 'B' ? 'bg-red-600 text-white' : 'bg-slate-700 text-slate-400'}`}
+                >
+                  {teamBName || 'B팀'}
+                </button>
+              </div>
             </div>
           </div>
           
@@ -148,10 +206,9 @@ export default function App() {
 
   const currentServer = getServer();
 
-  // --- 화면 2: 경기 화면 ---
+  // --- 화면 2: 경기 화면 (기존과 동일하되 시각적 서브 표시 포함) ---
   return (
     <div className="min-h-screen bg-black text-white flex flex-col overflow-hidden select-none">
-      {/* 상단 바 */}
       <div className="h-16 bg-slate-900 flex justify-between items-center px-6 border-b border-slate-800">
         <div className="flex items-center gap-4">
           <div className={`text-xl font-black ${setsA > setsB ? 'text-blue-400' : 'text-slate-500'}`}>{setsA}</div>
@@ -166,7 +223,6 @@ export default function App() {
         </div>
       </div>
 
-      {/* 스코어보드 */}
       <div className="flex-1 flex text-center relative">
         {matchFinished && (
           <div className="absolute inset-0 z-50 bg-black/95 flex flex-col items-center justify-center animate-in fade-in duration-500">
@@ -176,7 +232,6 @@ export default function App() {
           </div>
         )}
 
-        {/* 팀 A/B 영역 (Swapped 대응) */}
         {[
           { id: 'Left', team: swapped ? 'B' : 'A', name: swapped ? teamBName : teamAName, score: swapped ? scoreB : scoreA, border: 'border-r border-slate-900' },
           { id: 'Right', team: swapped ? 'A' : 'B', name: swapped ? teamAName : teamBName, score: swapped ? scoreA : scoreB, border: '' }
@@ -189,7 +244,7 @@ export default function App() {
             <div className="mb-2 text-slate-500 font-bold text-sm tracking-widest uppercase">{side.name}</div>
             <div className="relative">
               <div className="text-[10rem] font-black leading-none italic tracking-tighter">{side.score}</div>
-              {((!swapped && currentServer === side.team) || (swapped && currentServer === side.team)) && (
+              {currentServer === side.team && (
                 <div className="absolute -top-2 -right-6 w-4 h-4 bg-yellow-400 rounded-full animate-pulse shadow-[0_0_15px_rgba(250,204,21,0.6)]" />
               )}
             </div>
@@ -197,7 +252,6 @@ export default function App() {
         ))}
       </div>
 
-      {/* 하단 보조 바 */}
       <div className="h-24 bg-slate-900 flex justify-around items-center px-10 border-t border-slate-800">
         <button onClick={(e) => { e.stopPropagation(); saveHistory(); swapped ? setScoreB(Math.max(0, scoreB-1)) : setScoreA(Math.max(0, scoreA-1)) }} className="w-12 h-12 rounded-full bg-slate-800 flex items-center justify-center text-xl font-bold active:bg-slate-700 border border-slate-700">-</button>
         <div className="text-[10px] text-slate-600 font-black tracking-[0.2em] uppercase">Score Control</div>
